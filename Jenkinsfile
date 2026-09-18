@@ -67,24 +67,20 @@ pipeline {
         stage("Azure Login") {
             steps {
                 withCredentials([
-                    usernamePassword(
+                    azureServicePrincipal(
                         credentialsId: "azure-service-principal",
-                        usernameVariable: "AZURE_CLIENT_ID",
-                        passwordVariable: "AZURE_CLIENT_SECRET"
-                    ),
-                    string(
-                        credentialsId: "azure-tenant-id",
-                        variable: "AZURE_TENANT_ID"
-                    ),
-                    string(
-                        credentialsId: "azure-subscription-id",
-                        variable: "AZURE_SUBSCRIPTION_ID"
+                        subscriptionIdVariable: "AZURE_SUBSCRIPTION_ID",
+                        clientIdVariable: "AZURE_CLIENT_ID",
+                        clientSecretVariable: "AZURE_CLIENT_SECRET",
+                        tenantIdVariable: "AZURE_TENANT_ID"
                     )
                 ]) {
                     sh '''
                         set -e
 
+                        echo "======================================"
                         echo "Logging into Azure..."
+                        echo "======================================"
 
                         az login \
                             --service-principal \
@@ -96,7 +92,8 @@ pipeline {
                         az account set \
                             --subscription "$AZURE_SUBSCRIPTION_ID"
 
-                        echo "Azure account:"
+                        echo "Azure login successful."
+
                         az account show \
                             --query "{Name:name, Subscription:id, Tenant:tenantId}" \
                             --output table
@@ -110,7 +107,9 @@ pipeline {
                 sh '''
                     set -e
 
+                    echo "======================================"
                     echo "Building Docker image..."
+                    echo "======================================"
 
                     docker build \
                         -t ${ACR_NAME}.azurecr.io/${IMAGE_NAME}:${BUILD_NUMBER} \
@@ -118,7 +117,7 @@ pipeline {
 
                     echo "Docker image built successfully."
 
-                    docker images | grep ${IMAGE_NAME}
+                    docker images | grep "${IMAGE_NAME}"
                 '''
             }
         }
@@ -128,7 +127,9 @@ pipeline {
                 sh '''
                     set -e
 
+                    echo "======================================"
                     echo "Logging into Azure Container Registry..."
+                    echo "======================================"
 
                     az acr login \
                         --name ${ACR_NAME}
@@ -148,7 +149,9 @@ pipeline {
                 sh '''
                     set -e
 
-                    echo "Deploying image to Azure Container App..."
+                    echo "======================================"
+                    echo "Deploying to Azure Container Apps..."
+                    echo "======================================"
 
                     az containerapp update \
                         --name ${CONTAINER_APP} \
@@ -165,7 +168,9 @@ pipeline {
                 sh '''
                     set -e
 
-                    echo "Getting Container App URL..."
+                    echo "======================================"
+                    echo "Verifying Container App..."
+                    echo "======================================"
 
                     FQDN=$(az containerapp show \
                         --name ${CONTAINER_APP} \
@@ -192,13 +197,14 @@ pipeline {
 
         success {
             echo "======================================"
-            echo "Pipeline completed successfully!"
+            echo "PIPELINE COMPLETED SUCCESSFULLY!"
             echo "======================================"
         }
 
         failure {
             echo "======================================"
-            echo "Pipeline FAILED. Check the stage logs."
+            echo "PIPELINE FAILED!"
+            echo "Check the failed stage logs."
             echo "======================================"
         }
     }
